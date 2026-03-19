@@ -53,7 +53,6 @@ QList<QString> getLocalGames() {
 
 QJsonObject loadJsonFile(QString filePath) {
     // Returns the data from the JSON file at filePath
-    qDebug() << "checkpoint load file";
     QFile JsonFile(filePath);
     QJsonObject JsonData;
     if (JsonFile.exists() && JsonFile.open(QIODevice::ReadOnly)) {
@@ -61,7 +60,6 @@ QJsonObject loadJsonFile(QString filePath) {
     } else {
         JsonData = {};
     }
-    qDebug() << JsonData;
     return JsonData;
 }
 
@@ -99,16 +97,13 @@ void MainWindow::checkGamepad() {
     // Checks for controller events to initiate scrolling and selecting actions
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        qDebug() << event.type;
         if (event.type == SDL_JOYAXISMOTION) {
-            qDebug() << "arrows pressed";
             // Axis 0 is usually the D-Pad Left/Right
             this -> GamepadMovementToScroll(event.jaxis.axis, event.jaxis.value);
         }
 
         if (event.type == SDL_JOYBUTTONDOWN) {
             if (event.jbutton.button == 8) { // button 8 is SELECT
-
                 this -> executeSelectedGame(this -> loadedGames.keys()[this -> currentFocusIndex]);
             }
         }
@@ -120,21 +115,25 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
     if (event->type() == QEvent::KeyPress) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
         if (keyEvent->key() == Qt::Key_Left) {
+            qDebug() << "left";
             // Left arrow -> move select to the left
             this->moveFocus(-1);
             return true;
         }
         else if (keyEvent->key() == Qt::Key_Right) {
             // Right arrow -> move select to the right
+            qDebug() << "right";
             this->moveFocus(1);
             return true;
         }
         else if (keyEvent->key() == Qt::Key_Up) {
             // Up arrow -> move select to first button
+            qDebug() << "up";
             this -> moveFocus(-1 * this -> currentFocusIndex);
         }
         else if (keyEvent -> key() == Qt::Key_Down) {
             // Down arrow -> move select to last button
+            qDebug() << "down";
             this -> moveFocus(1 * (this -> loadedGames.keys().length() - this -> currentFocusIndex - 1));
         }
         else if (keyEvent->key() == Qt::Key_Space || keyEvent->key() == Qt::Key_Return) {
@@ -149,6 +148,8 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
 void MainWindow::moveFocus(int directionalMove) {
     // Moves the scrollArea a certain amount of directionalMove
     int currentSelectedIndex = this -> currentFocusIndex; // The index of the button currently in focus
+    qDebug() << currentSelectedIndex;
+    qDebug() << directionalMove;
     if (currentSelectedIndex + directionalMove >= 0 && currentSelectedIndex + directionalMove < this -> Buttons.length()) { // moving the selector is possible
         int currentValue = this -> scrollArea -> horizontalScrollBar() -> value(); // The current horizontal value of the scrollbar
         this -> scrollArea -> horizontalScrollBar() -> setValue(currentValue + directionalMove * (this -> buttonSize + this -> spacing)); // move the scrollbar
@@ -165,11 +166,13 @@ void MainWindow::moveFocus(int directionalMove) {
 void MainWindow::changeFocus(QPushButton *button, int setter) {
     // Switches the focus for a button to change visuals
     if (setter == -1) {
+        qDebug() << "unfocus button";
         //currently has focus, so revert to normal state
         button -> setFixedSize(this -> buttonSize,this -> buttonSize);
         button -> setContentsMargins(0,0,0,0);
         button -> setIconSize(QSize(this -> buttonSize,this -> buttonSize));
     } else if (setter == 1) {
+        qDebug() << "focus button";
         //currently doesn't have focus, so set focus
         button -> setFixedSize(this -> buttonSize * this -> resize,this -> buttonSize * this -> resize);
         button -> setContentsMargins(0,0,0,0);
@@ -182,7 +185,6 @@ void MainWindow::fetchGameData() {
     // Requests newest digital game data and executes parseGameJson when finished
     QUrl url("https://raw.githubusercontent.com/StijnTB/Corderius_Games/refs/heads/main/local_games_information.json");
     QNetworkReply *reply = this -> requestData(url);
-    qDebug() << "checkpoint 0";
     connect(reply, &QNetworkReply::finished, [this, reply]() { // when request is loaded, execute
         if (reply -> error() == QNetworkReply::NoError) {
             // if no error has occurred, parse data
@@ -198,7 +200,6 @@ void MainWindow::fetchGameData() {
 void MainWindow::parseGameJson(const QByteArray &data) {
     this -> Buttons = QList<QPushButton *>();
     QJsonDocument doc = QJsonDocument::fromJson(data);
-    qDebug() << doc;
     if (!doc.isObject()) return;
     QJsonObject root = doc.object();
     QFile currentGamesInformation("current_games_information.json");
@@ -208,9 +209,7 @@ void MainWindow::parseGameJson(const QByteArray &data) {
             currentGamesInformation.close();
         };
     };
-    qDebug() << "checkpoint before load";
     this -> oldGamesInformation = loadJsonFile("current_games_information.json");
-    qDebug() << "checkpoint 1";
     QList<QString> onlyLocalGames = getLocalGames();
     this -> newGamesInformation = root;
     QDir().mkdir("games");
@@ -218,9 +217,8 @@ void MainWindow::parseGameJson(const QByteArray &data) {
         this -> loadedGames[gameName] = "loaded";
         if (onlyLocalGames.contains(gameName)) {
             onlyLocalGames.removeAt(onlyLocalGames.indexOf(gameName));
-            qDebug() << "remove game " + gameName;
         };
-        QPushButton *currentButton = new QPushButton("Loading "+gameName);
+        QPushButton *currentButton = new QPushButton("Loading "+ gameName);
         currentButton->setMaximumSize((QSize(this -> buttonSize,this -> buttonSize)));
         currentButton->setContentsMargins(0,0,0,0);
         currentButton -> installEventFilter(this);
@@ -254,11 +252,9 @@ void MainWindow::parseGameJson(const QByteArray &data) {
     this -> loadLocalGames(onlyLocalGames);
     //this -> currentFocusButton->setFocus();
     this -> layout -> addSpacing((this -> width() - this -> spacing * 2 - buttonSize)/2 - this -> spacing);
-    qDebug() << this -> Buttons;
 }
 
 void MainWindow::loadLocalGames(QList<QString> onlyLocalGames) {
-    qDebug() << "local games: " << onlyLocalGames;
     for (const QString &gameName : onlyLocalGames) {
         QJsonObject gameData = loadJsonFile("games/"+gameName+"/"+gameName+"/gameInformation.json");
         QPushButton *currentButton = new QPushButton(gameName);
@@ -270,7 +266,6 @@ void MainWindow::loadLocalGames(QList<QString> onlyLocalGames) {
             QIcon gameIcon("games/"+gameName+"/"+gameName+"/"+gameData["iconPath"].toString());
             currentButton -> setIcon(gameIcon);
         }
-        qDebug() << "new button for local game " + gameName;
         if (Buttons.isEmpty()) {
             this -> changeFocus(currentButton, 1);
             this -> currentFocusButton = currentButton;
@@ -282,13 +277,11 @@ void MainWindow::loadLocalGames(QList<QString> onlyLocalGames) {
             qDebug() << "Button" << gameName << "was clicked! Loading game ...";
             this -> executeSelectedGame(gameName);
         });
-        qDebug() << "game "+ gameName + " with data " << gameData;
     };
 }
 
 void MainWindow::downloadImage(QPushButton *targetButton, QString gameName) {
     QUrl iconUrl(this ->newGamesInformation[gameName].toObject()["thumbnail_link"].toString());
-    qDebug() << iconUrl;
     QList<QString> urlParts = iconUrl.toString().split(".");
     QString iconFileName = gameName+"_icon."+ urlParts[urlParts.length() - 1];
     if (QFile::exists("icons/"+iconFileName)) {
@@ -318,7 +311,6 @@ void MainWindow::downloadImage(QPushButton *targetButton, QString gameName) {
             if (file.open(QIODevice::WriteOnly)) {
                 file.write(iconData);
                 file.close();
-                qDebug() << "saved icon at " + QDir().absoluteFilePath("icons/"+ iconFileName);
             };
         } else {
             qDebug() << "error with request " + iconUrl.toString();
@@ -335,7 +327,7 @@ void MainWindow::processNextUpdate() {
 
     // Get the first game title from the list
     QString nextGame = this -> updateGames[0];
-    qDebug() << updateGames;
+    
     // Start the update process for this specific game
     QJsonObject nextGameInformation = this -> newGamesInformation[nextGame].toObject();
 
@@ -346,7 +338,6 @@ void MainWindow::processNextUpdate() {
 }
 
 void MainWindow::downloadGame(const QUrl &url, QString gameName, QString newVersion, QPushButton *currentButton) {
-    qDebug() << "download game " << gameName;
     QNetworkReply *reply = this -> requestData(url);
 
     connect(reply, &QNetworkReply::finished, [this, reply, gameName, currentButton, newVersion]() {
@@ -372,32 +363,18 @@ void MainWindow::downloadGame(const QUrl &url, QString gameName, QString newVers
             if (file.open(QIODevice::WriteOnly)) {
                 file.write(zipData);
                 file.close();
-                if (file.exists()) {
-                    qDebug() << file.fileName();
-                }
                 QString program;
                 QList<QString> arguments;
                 QProcess *unzipProcess = new QProcess(this);
                 unzipProcess->setWorkingDirectory(QDir::currentPath());
                 #ifdef Q_OS_WIN
                     program = "powershell";
-                    arguments << "-Command" << "Expand-Archive" << "-Path" << tempZip << "-DestinationPath" << "games/"+gameName << "-Force";
+                    arguments << "-Command" << "Expand-Archive -Path '" + tempZip + "' -DestinationPath 'games/"+gameName + "' -Force";
                 #else
                     program = "unzip";
-                    arguments << tempZip << "-d" << "games/"+gameName;
-                    connect(unzipProcess, &QProcess::readyReadStandardOutput, this, [unzipProcess]() {
-                        QString output = unzipProcess -> readAllStandardOutput();
-                        qDebug() << output;
-                        for (const QString &line : output.split('\n')) {
-                            QString trimmed = line.trimmed();
-                            if (trimmed.startsWith("inflating:") || trimmed.startsWith("extracting:")) {
-                                QString filename = trimmed.section(':',1).trimmed();
-                                qDebug() << "Extracted: " << filename;
-                            }
-                        }
-                    });
+                    arguments << "'" + tempZip + "'-d" << "games/"+gameName;
                 #endif
-                
+
                 unzipProcess->start(program, arguments);
 
                 connect(unzipProcess, &QProcess::errorOccurred, [](QProcess::ProcessError error) {
@@ -425,6 +402,7 @@ void MainWindow::downloadGame(const QUrl &url, QString gameName, QString newVers
                                 newSavefile.close();
                             };
                         };
+                        currentButton -> setText("");
                         this->processNextUpdate();
                         QFile currentGamesInformationFile("current_games_information.json");
                         if (currentGamesInformationFile.open(QIODevice::ReadWrite)) {
@@ -446,7 +424,6 @@ void MainWindow::downloadGame(const QUrl &url, QString gameName, QString newVers
         };
         reply -> deleteLater();
     });
-
 }
 
 void MainWindow::setupPythonGame(QString gameName) {
@@ -484,7 +461,7 @@ void MainWindow::executeSelectedGame(const QString gameName) {
     if (!(this -> loadedGames[gameName].toString() == "loaded")) {
         qDebug() << "game "+ gameName + " not yet loaded.";
         return;
-    }
+    };
     QJsonObject gameData;
     if (this -> newGamesInformation.contains(gameName)) {
         //get executable path through newGamesInformation dict
@@ -499,15 +476,14 @@ void MainWindow::executeSelectedGame(const QString gameName) {
     if (!QFile::exists("games/" + gameName + "/" + gameName + "/" + gameExecutablePath)) {
         qDebug() << "could not find executable file at relative path 'games/" + gameName + "/" + gameName + "/" + gameExecutablePath + "'.";
         return;
-    }
+    };
 
-    if (!(executableFileType == ".py" || executableFileType == ".exe")) {
+    if (executableFileType != ".py") {
         qDebug() << "unknown executable type for game " + gameName + ": '" + executableFileType + "'. unable to load game";
         return;
     };
 
     QString baseDir = QDir::currentPath() + "/games/" + gameName + "/" + gameName;
-    qDebug() << "basedir: " + baseDir;
     QProcess *executeGameProcess = new QProcess(this);
     executeGameProcess -> setWorkingDirectory(baseDir);
 
@@ -521,10 +497,7 @@ void MainWindow::executeSelectedGame(const QString gameName) {
             qDebug() << "virtual environment folder /venv missing; start installation.";
             this -> setupPythonGame(gameName);
         };
-    } else if (executableFileType == ".exe") {
-        executeGameProcess -> start(baseDir + "/" + gameExecutablePath, QStringList());
-    }
-
+    };
     connect(executeGameProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), [this, executeGameProcess, gameName](int exitCode) {
         qDebug() << "Game " + gameName + " exited with code:" << exitCode;
         this -> loadingOverlay -> hide();
@@ -579,12 +552,12 @@ void MainWindow::createStatusBar() {
         qDebug() << "login ...";
         this -> onLoginButtonClick();
     });
+    adminLoginButton -> setFocusPolicy(Qt::NoFocus);
     mainStatusBar->insertPermanentWidget(0, adminLoginButton);
     this->setStatusBar(mainStatusBar);
 }
 
 void saveAdminPassword(QString textPassword) {
-    qDebug() << "make admin file";
     QByteArray hash = QCryptographicHash::hash(textPassword.toUtf8(), QCryptographicHash::Sha256);
     QFile file("admin_access.dat");
     if (file.open(QIODevice::WriteOnly)) {
@@ -592,6 +565,7 @@ void saveAdminPassword(QString textPassword) {
         file.close();
     };
 }
+
 bool checkPassword(QString passwordAttempt) {
     QFile file("admin_access.dat");
     if (!file.exists()) {
@@ -604,10 +578,10 @@ bool checkPassword(QString passwordAttempt) {
     QByteArray inputHash =  QCryptographicHash::hash(passwordAttempt.toUtf8(), QCryptographicHash::Sha256).toHex();
     return (inputHash == storedHash);
 }
+
 void MainWindow::onLoginButtonClick() {
     QInputDialog *passwordInputBox = new QInputDialog(this);
-    passwordInputBox->setFixedSize(QSize(200,200));
-    qDebug() << this->geometry().x() << this->geometry().y() << " ";
+    passwordInputBox->setFixedSize(QSize(this -> buttonSize,this -> buttonSize));
     passwordInputBox->setGeometry(((this -> geometry().x()) + 200),((this->geometry().y()) + 200),200,200);
     passwordInputBox->setLabelText(QString("Enter password"));
     passwordInputBox->setOkButtonText(QString("Login"));
@@ -620,7 +594,7 @@ void MainWindow::onLoginButtonClick() {
         QString passwordInput = passwordInputBox->textValue();
         qDebug() << "button clicked. input was: " << passwordInput;
         bool passwordWasCorrect = checkPassword(passwordInput);
-        qDebug() << passwordWasCorrect;
+        qDebug() << "password correct: " << passwordWasCorrect;
         if (passwordWasCorrect) {
             this -> userIsAdmin = true;
         };
@@ -631,33 +605,32 @@ void MainWindow::onLoginButtonClick() {
     });
 }
 
-
-
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+    this -> showFullScreen();
+    QSize windowSize = qApp->screens()[0]->size();
     ui->setupUi(this);
     setupSDLJoystick();
-    this -> showFullScreen();
-    //this -> showFullScreen();
+
+    
     this -> createOverlay();
 
     this -> scrollArea = new QScrollArea(this);
     this -> scrollArea -> setWidgetResizable(true);
     this -> scrollArea -> setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     this -> scrollArea -> setFrameShape(QFrame::NoFrame);
-    this -> scrollArea -> setFocusPolicy(Qt::NoFocus);
+    // this -> scrollArea -> setFocusPolicy(Qt::NoFocus);
     this -> scrollArea -> horizontalScrollBar() ->setDisabled(true);
 
     QWidget *container = new QWidget();
     this -> layout = new QHBoxLayout(container);
     this -> layout -> setContentsMargins(this -> spacing, this -> spacing, this -> spacing, this -> spacing);
-    this -> scrollArea -> setGeometry(QRect(this -> spacing, this -> buttonSize, (this -> width() - this -> spacing * 2), (this -> height() - this -> buttonSize * 2)));
+    this -> scrollArea -> setGeometry(QRect(this -> spacing, this -> buttonSize, (windowSize.width() - this -> spacing * 2), (windowSize.height() - this -> buttonSize * 2)));
     this->fetchGameData();
 
-    int centerPadding = (this -> width() - this -> spacing * 2 - buttonSize)/2 - this -> spacing;
+    int centerPadding = (windowSize.width() - this -> spacing * 2 - buttonSize)/2 - this -> spacing;
     this -> layout -> setSpacing(this -> spacing);
     this -> layout -> addSpacing(centerPadding);
 
@@ -670,10 +643,12 @@ MainWindow::MainWindow(QWidget *parent)
     controllerTimer->setSingleShot(false);
     connect(controllerTimer, &QTimer::timeout, this, &MainWindow::checkGamepad);
     controllerTimer->start(1);
+
+    this -> scrollArea -> setFocus();
+    this -> scrollArea -> installEventFilter(this);
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
 }
-
